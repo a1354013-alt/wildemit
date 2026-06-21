@@ -24,8 +24,26 @@ if (false) {
   // @ts-expect-error - wrong payload shape should fail
   bus.emit('user:created', { id: 'u001', amount: 999 })
 
+  // @ts-expect-error - payload does not match event payload type
+  bus.emit('user:deleted', { amount: 999 })
+
   // @ts-expect-error - unknown namespace wildcard should fail
   bus.on('payment:*', event => {
+    console.log(event)
+  })
+
+  // @ts-expect-error - suffix wildcards are intentionally unsupported
+  bus.on('*:created', event => {
+    console.log(event)
+  })
+
+  // @ts-expect-error - multi-segment wildcards are intentionally unsupported
+  bus.on('user:*:created', event => {
+    console.log(event)
+  })
+
+  // @ts-expect-error - recursive wildcards are intentionally unsupported
+  bus.on('user:**', event => {
     console.log(event)
   })
 

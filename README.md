@@ -2,16 +2,7 @@
 
 A tiny type-safe event bus with wildcard subscriptions for TypeScript apps.
 
-## Features
-
-- Type-safe event names
-- Type-safe payloads
-- Wildcard subscriptions: `*` and `user:*`
-- Sync and async emit
-- Tiny runtime and zero runtime dependencies
-- Works in Node.js and browsers
-
-## Install
+## Installation
 
 ```bash
 npm install wildemit
@@ -29,7 +20,7 @@ type Events = {
 
 const bus = createBus<Events>()
 
-bus.on('user:created', payload => {
+const unsubscribe = bus.on('user:created', payload => {
   console.log(payload.name)
 })
 
@@ -37,25 +28,52 @@ bus.emit('user:created', {
   id: 'u001',
   name: 'YangWen',
 })
+
+unsubscribe()
 ```
 
-## TypeScript catches event mistakes
+## Type-safe event names
 
 ```ts
-bus.emit('user:created', {
-  id: 'u001',
-  amount: 999,
-})
-// TypeScript error: payload shape does not match 'user:created'
+type Events = {
+  'user:created': { id: string; name: string }
+}
 
-bus.emit('user:create', {
-  id: 'u001',
-  name: 'YangWen',
-})
-// TypeScript error: event name should be 'user:created'
+const bus = createBus<Events>()
+
+bus.emit('user:created', { id: 'u001', name: 'YangWen' })
+
+// @ts-expect-error
+bus.emit('user:create', { id: 'u001', name: 'YangWen' })
 ```
 
-## Namespace wildcard
+## Type-safe payloads
+
+```ts
+type Events = {
+  'user:created': { id: string; name: string }
+  'user:deleted': { id: string }
+}
+
+const bus = createBus<Events>()
+
+bus.emit('user:deleted', { id: 'u001' })
+
+// @ts-expect-error
+bus.emit('user:created', { amount: 999 })
+```
+
+## Wildcard subscriptions
+
+Global wildcard:
+
+```ts
+bus.on('*', event => {
+  console.log(event.type, event.payload)
+})
+```
+
+Prefix wildcard:
 
 ```ts
 type Events = {
@@ -77,184 +95,58 @@ bus.on('user:*', event => {
 })
 ```
 
-`user:*` receives only events that start with `user:`.
+`user:*` only matches event names that start with `user:`.
 
-## Global wildcard
-
-```ts
-bus.on('*', event => {
-  console.log(`[${event.type}]`, event.payload)
-})
-```
-
-This is useful for debug logs, analytics, test reports, and plugin-style systems.
-
-## API
+## API reference
 
 ### `createBus<TEvents>()`
 
 Creates a new typed event bus.
 
-```ts
-const bus = createBus<Events>()
-```
-
 ### `on(event, handler)`
 
-Subscribes to an exact event or wildcard pattern. It returns an unsubscribe function.
-
-```ts
-const off = bus.on('user:created', payload => {
-  console.log(payload.id)
-})
-
-off()
-```
-
-### `once(event, handler)`
-
-Runs the listener once and then removes it.
-
-```ts
-bus.once('user:created', payload => {
-  console.log('only once:', payload.id)
-})
-```
+Subscribes to an exact event name, `*`, or `prefix:*`. Returns an unsubscribe function.
 
 ### `off(event, handler)`
 
-Removes a listener manually.
+Removes a previously registered handler.
 
-```ts
-const handler = (payload: Events['user:created']) => {
-  console.log(payload.id)
-}
+### `once(event, handler)`
 
-bus.on('user:created', handler)
-bus.off('user:created', handler)
-```
+Subscribes to a handler that runs only once.
 
 ### `emit(event, payload)`
 
-Synchronously emits an event. If a listener throws, the error is not swallowed.
-
-```ts
-bus.emit('user:created', {
-  id: 'u001',
-  name: 'YangWen',
-})
-```
+Synchronously emits an event. Listener errors are not swallowed.
 
 ### `emitAsync(event, payload)`
 
-Emits an event and waits for all async listeners in parallel.
-
-```ts
-await bus.emitAsync('user:created', {
-  id: 'u001',
-  name: 'YangWen',
-})
-```
+Emits an event and waits for all listeners, including async listeners.
 
 ### `clear()`
 
-Removes all listeners.
+Removes all listeners from the bus.
 
-```ts
-bus.clear()
-```
+### `listenerCount(pattern?)`
 
-### `listenerCount(event?)`
+Returns the number of listeners for one event or pattern, or the total when omitted.
 
-Counts listeners for one event/pattern, or all listeners when no argument is passed.
+## Design limits
 
-```ts
-bus.listenerCount('user:created')
-bus.listenerCount()
-```
+`wildemit` intentionally supports only these wildcard patterns:
 
-## Wildcard rules
+- `*`
+- `prefix:*`
 
-MVP intentionally supports only two wildcard forms:
+It does not support complex glob styles such as `*:created`, `user:**`, `user:*:created`, or `user:{created,deleted}`. Keeping the rules narrow makes the runtime small and the type system predictable.
 
-| Pattern | Meaning |
-|---|---|
-| `*` | Listen to all events |
-| `prefix:*` | Listen to events that start with `prefix:` |
+## Zero dependencies
 
-Examples:
+`wildemit` has zero runtime dependencies.
 
-```ts
-bus.on('*', event => {})
-bus.on('user:*', event => {})
-bus.on('order:*', event => {})
-```
+## Node.js and browser support
 
-Not supported in v0.1:
-
-```ts
-bus.on('user:*:created', () => {})
-bus.on('*:created', () => {})
-bus.on('user:**', () => {})
-```
-
-This keeps the package small, predictable, and easy to understand.
-
-## Development
-
-```bash
-npm install
-npm run typecheck
-npm test
-npm run build
-npm run ci
-```
-
-## Project structure
-
-```txt
-wildemit/
-├─ src/
-│  ├─ index.ts
-│  ├─ create-bus.ts
-│  ├─ types.ts
-│  └─ wildcard.ts
-├─ tests/
-│  ├─ create-bus.test.ts
-│  ├─ wildcard.test.ts
-│  ├─ async.test.ts
-│  └─ type-safety.test.ts
-├─ examples/
-│  ├─ basic.ts
-│  ├─ wildcard.ts
-│  ├─ vue-like.ts
-│  └─ node-cli.ts
-├─ .github/workflows/ci.yml
-├─ package.json
-├─ tsconfig.json
-├─ vitest.config.ts
-├─ README.md
-├─ LICENSE
-└─ .gitignore
-```
-
-## Roadmap
-
-### v0.2 ideas
-
-- `emitSerial()` for ordered async listeners
-- `hasListeners()` helper
-- `onMany()` for subscribing to multiple events
-- `offAll(event)` for clearing one event/pattern
-- Debug logger example
-
-### v1.0 ideas
-
-- Vue composable example package
-- React hook example package
-- AbortSignal support
-- Async iterator support
-- Event history for debugging
+The published package ships both ESM and CJS builds and has no platform-specific runtime dependencies, so it works in Node.js and browser-based TypeScript builds.
 
 ## License
 
