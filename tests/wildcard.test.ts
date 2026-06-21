@@ -15,6 +15,12 @@ describe('wildcard subscriptions', () => {
     expect(matchesWildcard('user:created', 'user:created')).toBe(true)
   })
 
+  it('does not treat complex glob patterns as supported wildcards', () => {
+    expect(matchesWildcard('*:created', 'user:created')).toBe(false)
+    expect(matchesWildcard('user:*:created', 'user:created')).toBe(false)
+    expect(matchesWildcard('user:**', 'user:created')).toBe(false)
+  })
+
   it('emits all events to global wildcard listeners', () => {
     const bus = createBus<AppEvents>()
     const handler = vi.fn()
