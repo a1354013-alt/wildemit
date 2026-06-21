@@ -44,3 +44,47 @@ describe('emitAsync', () => {
     await expect(bus.emitAsync('task:done', { taskId: 't001' })).rejects.toThrow('async boom')
   })
 })
+
+describe('emitSerial', () => {
+  it('runs async handlers in sequence', async () => {
+    const bus = createBus<AppEvents>()
+    const calls: string[] = []
+
+    bus.on('user:created', async () => {
+      calls.push('first:start')
+      await Promise.resolve()
+      calls.push('first:end')
+    })
+
+    bus.on('user:created', async () => {
+      calls.push('second:start')
+      await Promise.resolve()
+      calls.push('second:end')
+    })
+
+    await bus.emitSerial('user:created', { id: 'u001', name: 'YangWen' })
+
+    expect(calls).toEqual(['first:start', 'first:end', 'second:start', 'second:end'])
+  })
+
+  it('stops on the first async listener error and rethrows it', async () => {
+    const bus = createBus<AppEvents>()
+    const calls: string[] = []
+
+    bus.on('task:done', async () => {
+      calls.push('first')
+    })
+
+    bus.on('task:done', async () => {
+      calls.push('second')
+      throw new Error('serial boom')
+    })
+
+    bus.on('task:done', async () => {
+      calls.push('third')
+    })
+
+    await expect(bus.emitSerial('task:done', { taskId: 't001' })).rejects.toThrow('serial boom')
+    expect(calls).toEqual(['first', 'second'])
+  })
+})

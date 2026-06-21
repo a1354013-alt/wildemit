@@ -123,13 +123,34 @@ Synchronously emits an event. Listener errors are not swallowed.
 
 Emits an event and waits for all listeners, including async listeners.
 
+### `emitSerial(event, payload)`
+
+Emits an event and awaits matching listeners one by one. If any listener throws or rejects, later listeners are skipped and the error is rethrown.
+
 ### `clear()`
 
 Removes all listeners from the bus.
 
+### `offAll(pattern?)`
+
+Removes all listeners for one exact event or wildcard pattern. When omitted, it behaves the same as `clear()`.
+
 ### `listenerCount(pattern?)`
 
 Returns the number of listeners for one event or pattern, or the total when omitted.
+
+### `hasListeners(pattern?)`
+
+Returns `true` when one exact event or wildcard pattern has listeners, or when the bus has any listeners if omitted.
+
+## Async behavior
+
+```ts
+await bus.emitAsync('user:created', { id: 'u001', name: 'YangWen' })
+await bus.emitSerial('user:created', { id: 'u001', name: 'YangWen' })
+```
+
+Use `emitAsync` when listeners may run in parallel. Use `emitSerial` when order matters and later listeners must stop after the first failure.
 
 ## Design limits
 

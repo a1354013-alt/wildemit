@@ -87,9 +87,18 @@ export function createBus<TEvents extends EventMap>(): EventBus<TEvents> {
     return handlers
   }
 
+  function getMatchingHandlers(eventName: string): {
+    exactHandlers: AnyHandler[]
+    wildcardHandlers: AnyHandler[]
+  } {
+    return {
+      exactHandlers: getExactHandlers(eventName),
+      wildcardHandlers: getWildcardHandlers(eventName),
+    }
+  }
+
   function emitEvent(eventName: string, payload: unknown): void {
-    const exactHandlers = getExactHandlers(eventName)
-    const wildcardHandlers = getWildcardHandlers(eventName)
+    const { exactHandlers, wildcardHandlers } = getMatchingHandlers(eventName)
 
     for (const handler of exactHandlers) {
       handler(payload)
@@ -106,8 +115,7 @@ export function createBus<TEvents extends EventMap>(): EventBus<TEvents> {
   }
 
   async function emitEventAsync(eventName: string, payload: unknown): Promise<void> {
-    const exactHandlers = getExactHandlers(eventName)
-    const wildcardHandlers = getWildcardHandlers(eventName)
+    const { exactHandlers, wildcardHandlers } = getMatchingHandlers(eventName)
     const wildcardEvent = {
       type: eventName,
       payload,
@@ -119,8 +127,33 @@ export function createBus<TEvents extends EventMap>(): EventBus<TEvents> {
     ])
   }
 
+  async function emitEventSerial(eventName: string, payload: unknown): Promise<void> {
+    const { exactHandlers, wildcardHandlers } = getMatchingHandlers(eventName)
+    const wildcardEvent = {
+      type: eventName,
+      payload,
+    }
+
+    for (const handler of exactHandlers) {
+      await handler(payload)
+    }
+
+    for (const handler of wildcardHandlers) {
+      await handler(wildcardEvent)
+    }
+  }
+
   function clear(): void {
     listeners.clear()
+  }
+
+  function clearPattern(pattern?: string): void {
+    if (pattern) {
+      listeners.delete(pattern)
+      return
+    }
+
+    clear()
   }
 
   function countListeners(pattern?: string): number {
@@ -187,8 +220,23 @@ export function createBus<TEvents extends EventMap>(): EventBus<TEvents> {
     await emitEventAsync(event, payload)
   }
 
+  async function publicEmitSerial<TName extends EventName<TEvents>>(
+    event: TName,
+    payload: TEvents[TName],
+  ): Promise<void> {
+    await emitEventSerial(event, payload)
+  }
+
+  function publicOffAll(pattern?: EventPattern<TEvents>): void {
+    clearPattern(pattern)
+  }
+
   function publicListenerCount(pattern?: EventPattern<TEvents>): number {
     return countListeners(pattern)
+  }
+
+  function publicHasListeners(pattern?: EventPattern<TEvents>): boolean {
+    return countListeners(pattern) > 0
   }
 
   return {
@@ -197,7 +245,10 @@ export function createBus<TEvents extends EventMap>(): EventBus<TEvents> {
     off: publicOff,
     emit: publicEmit,
     emitAsync: publicEmitAsync,
+    emitSerial: publicEmitSerial,
     clear,
+    offAll: publicOffAll,
     listenerCount: publicListenerCount,
+    hasListeners: publicHasListeners,
   }
 }

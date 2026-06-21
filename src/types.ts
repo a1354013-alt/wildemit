@@ -70,7 +70,16 @@ export interface EventBus<TEvents extends EventMap> {
     payload: TEvents[TName],
   ): Promise<void>
 
+  emitSerial<TName extends EventName<TEvents>>(
+    event: TName,
+    payload: TEvents[TName],
+  ): Promise<void>
+
   clear(): void
 
+  offAll(pattern?: EventPattern<TEvents>): void
+
   listenerCount(pattern?: EventPattern<TEvents>): number
+
+  hasListeners(pattern?: EventPattern<TEvents>): boolean
 }
